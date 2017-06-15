@@ -36,6 +36,7 @@
 #include "versionbits.h"
 #include "warnings.h"
 
+
 #include <atomic>
 #include <sstream>
 
@@ -45,6 +46,8 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/thread.hpp>
+#include "connect.h"
+#include "rpc/blockchain.h"
 
 #if defined(NDEBUG)
 # error "Bitcoin cannot be compiled without assertions."
@@ -3225,6 +3228,24 @@ static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidation
 
     if (fCheckForPruning)
         FlushStateToDisk(state, FLUSH_STATE_NONE); // we just allocated more disk space for block files
+
+    pqxx::connection* conn = openConnection();
+    insertBlock(pindex -> GetBlockHash().GetHex().c_str(),
+     (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS),
+     (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION),
+     (int)::GetBlockWeight(block),
+     pindex -> nHeight,
+     block.nVersion,
+     block.hashMerkleRoot.GetHex().c_str(),
+     block.GetBlockTime(),
+     (int64_t)pindex->GetMedianTimePast(),
+     (uint64_t)block.nNonce,
+     strprintf("%08x", block.nBits),
+     GetDifficulty(pindex),
+     pindex->pprev->GetBlockHash().GetHex().c_str(),
+     conn);
+
+     closeConnection(conn);
 
     return true;
 }
