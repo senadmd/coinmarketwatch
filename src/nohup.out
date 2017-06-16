@@ -1,0 +1,12 @@
+clientversion.h:39:38: error: ‘CLIENT_VERSION_MAJOR’ was not declared in this scope
+                            1000000 * CLIENT_VERSION_MAJOR
+                                      ^
+clientversion.h:40:38: error: ‘CLIENT_VERSION_MINOR’ was not declared in this scope
+                          +   10000 * CLIENT_VERSION_MINOR
+                                      ^
+clientversion.h:41:38: error: ‘CLIENT_VERSION_REVISION’ was not declared in this scope
+                          +     100 * CLIENT_VERSION_REVISION
+                                      ^
+clientversion.h:42:38: error: ‘CLIENT_VERSION_BUILD’ was not declared in this scope
+                          +       1 * CLIENT_VERSION_BUILD;
+                                      ^
