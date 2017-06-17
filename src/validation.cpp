@@ -46,6 +46,7 @@
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/thread.hpp>
 
+#include "base58.h"
 #include "connect.h"
 #include "rpc/blockchain.h"
 #include "core_write.h"
@@ -3270,17 +3271,20 @@ static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidation
         }
          for (unsigned int i = 0; i < tx->vout.size(); i++) {
          txnouttype type;
-        //  std::vector<CTxDestination*> addresses;
+         std::vector<CTxDestination> addresses;
          int nRequiredSigs;
          const CTxOut& txout = tx->vout[i]; 
-        // float value = txout.nValue;
-        // //value = ((value < 0)?(-value):value)/COIN;
-        // //ExtractDestinations(txout.scriptPubKey, type, addresses, nRequiredSigs);
+         float value = txout.nValue;
+         value = ((value < 0)?(-value):value)/COIN;
+         ExtractDestinations(txout.scriptPubKey, type, addresses, nRequiredSigs);
 
-        // // insertTransactionOut(txid,
-        // //  value, i, ScriptToAsmStr(txout.scriptPubKey),
-        // //  HexStr(txout.scriptPubKey.begin(), txout.scriptPubKey.end(),
-        // //  GetTxnOutputType(type), nRequiredSigs, conn);
+        insertTransactionOut(txid,
+         value, i, ScriptToAsmStr(txout.scriptPubKey,false),
+         HexStr(txout.scriptPubKey.begin(), txout.scriptPubKey.end()),
+         GetTxnOutputType(type), nRequiredSigs, conn);
+
+        BOOST_FOREACH(const CTxDestination& addr, addresses)
+         insertTransactionOutAddress(txid, i, CBitcoinAddress(addr).ToString(),conn);
 
         }
     }
