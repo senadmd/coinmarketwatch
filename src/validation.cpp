@@ -46,6 +46,10 @@
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/thread.hpp>
 
+#include "connect.h"
+#include "rpc/blockchain.h"
+#include "core_write.h"
+
 #if defined(NDEBUG)
 # error "Bitcoin cannot be compiled without assertions."
 #endif
@@ -3225,6 +3229,65 @@ static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidation
 
     if (fCheckForPruning)
         FlushStateToDisk(state, FLUSH_STATE_NONE); // we just allocated more disk space for block files
+
+    pqxx::connection* conn = openConnection();
+    const char* blockHash = pindex -> GetBlockHash().GetHex().c_str();
+    insertBlock(blockHash,
+     (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS),
+     (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION),
+     (int)::GetBlockWeight(block),
+     pindex -> nHeight,
+     block.nVersion,
+     block.hashMerkleRoot.GetHex().c_str(),
+     block.GetBlockTime(),
+     (int64_t)pindex->GetMedianTimePast(),
+     (uint64_t)block.nNonce,
+     strprintf("%08x", block.nBits),
+     GetDifficulty(pindex),
+     pindex->pprev->GetBlockHash().GetHex().c_str(),
+     conn);
+
+     for(const auto& tx : block.vtx)
+    {
+        std::string txid =tx->GetHash().GetHex();
+        insertTransaction(txid,
+         tx->GetWitnessHash().GetHex(),
+         tx->nVersion,
+         (int)::GetSerializeSize(*tx, SER_NETWORK, PROTOCOL_VERSION),
+         (int)::GetVirtualTransactionSize(*tx),
+         (int64_t)tx->nLockTime,
+         blockHash,
+         conn);
+        for (unsigned int i = 0; i < tx->vin.size(); i++) {
+        const CTxIn& txin = tx->vin[i];
+        insertTransactionIn(txid, tx->IsCoinBase(),
+        txin.prevout.hash.GetHex(),
+        txin.prevout.n,
+        ScriptToAsmStr(txin.scriptSig, true),
+        HexStr(txin.scriptSig.begin(), txin.scriptSig.end()),
+        (int64_t)txin.nSequence,
+        conn);
+        }
+         for (unsigned int i = 0; i < tx->vout.size(); i++) {
+         txnouttype type;
+        //  std::vector<CTxDestination*> addresses;
+         int nRequiredSigs;
+         const CTxOut& txout = tx->vout[i]; 
+        // float value = txout.nValue;
+        // //value = ((value < 0)?(-value):value)/COIN;
+        // //ExtractDestinations(txout.scriptPubKey, type, addresses, nRequiredSigs);
+
+        // // insertTransactionOut(txid,
+        // //  value, i, ScriptToAsmStr(txout.scriptPubKey),
+        // //  HexStr(txout.scriptPubKey.begin(), txout.scriptPubKey.end(),
+        // //  GetTxnOutputType(type), nRequiredSigs, conn);
+
+        }
+    }
+
+
+     closeConnection(conn);
+
 
     return true;
 }

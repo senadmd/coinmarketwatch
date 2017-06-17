@@ -8,6 +8,7 @@ src/bitcoin-tx
 src/test/test_bitcoin
 src/test/test_bitcoin_fuzzy
 src/qt/test/test_bitcoin-qt
+db4/
 
 # autoreconf
 Makefile.in
@@ -80,7 +81,6 @@ Bitcoin-Qt.app
 # Unit-tests
 Makefile.test
 bitcoin-qt_test
-src/test/buildenv.py
 
 # Resources cpp
 qrc_*.cpp
@@ -101,8 +101,8 @@ coverage_percent.txt
 linux-coverage-build
 linux-build
 win32-build
-qa/pull-tester/tests_config.py
-qa/cache/*
+test/config.ini
+test/cache/*
 
 !src/leveldb*/Makefile
 
