@@ -289,6 +289,11 @@ double GuessVerificationProgress(const ChainTxData& data, CBlockIndex* pindex);
 void PruneOneBlockFile(const int fileNumber);
 
 /**
+ *  Mark one block file as pruned.
+ */
+void PruneOneBlockFile(const int fileNumber);
+
+/**
  *  Actually unlink the specified files
  */
 void UnlinkPrunedFiles(const std::set<int>& setFilesToPrune);
