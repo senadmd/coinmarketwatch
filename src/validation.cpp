@@ -3153,23 +3153,38 @@ bool ProcessNewBlockHeaders(const std::vector<CBlockHeader>& headers, CValidatio
     NotifyHeaderTip();
     return true;
 }
-void InsertBlockToLocalDB(CBlock& block,CBlockIndex *pindex, pqxx::connection* conn){
+void InsertBlockToLocalDB(const CBlock& block, CBlockIndex *&pindex, pqxx::connection* conn){
     const char* blockHash = pindex -> GetBlockHash().GetHex().c_str();
-    insertBlock(blockHash,
-     (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS),
-     (int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION),
-     (int)::GetBlockWeight(block),
-     pindex -> nHeight,
-     block.nVersion,
-     block.hashMerkleRoot.GetHex().c_str(),
-     block.GetBlockTime(),
-     (int64_t)pindex->GetMedianTimePast(),
-     (uint64_t)block.nNonce,
-     strprintf("%08x", block.nBits),
-     GetDifficulty(pindex),
-     pindex->pprev->GetBlockHash().GetHex().c_str(),
-     conn);
+    int strippedSize =(int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS);
+    int size =(int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+    int weight = (int)::GetBlockWeight(block);
+    unsigned int height = pindex -> nHeight;
+    int version =block.nVersion;
+    const char* merklerootHash= block.hashMerkleRoot.GetHex().c_str();
+    int64_t blocktime =block.GetBlockTime();
+    int64_t medianTime = (int64_t)pindex->GetMedianTimePast();
+    uint64_t nonce =(uint64_t)block.nNonce;
+    std::string bits = strprintf("%08x", block.nBits);
+    double difficulty = GetDifficulty(pindex);
+    std::string prevblockhash ="";
 
+    if (height>0)
+    prevblockhash = pindex->pprev->GetBlockHash().GetHex();
+
+    insertBlock(blockHash,
+     strippedSize,
+     size,
+     weight,
+     height,
+     version,
+     merklerootHash,
+     blocktime,
+     medianTime,
+     nonce,
+     bits,
+     difficulty,
+     prevblockhash.c_str(),
+     conn);
      for(const auto& tx : block.vtx)
     {
         std::string txid =tx->GetHash().GetHex();
@@ -3291,7 +3306,8 @@ static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidation
     //Open connection to local DB
     pqxx::connection* conn = openConnection();
     //Insert block to local DB
-    InsertBlockToLocalDB(const_cast<CBlock&>(block),pindex,conn);
+
+    InsertBlockToLocalDB(block,pindex,conn);
     //Close connection to local DB
     closeConnection(conn);
 
@@ -3680,6 +3696,7 @@ CVerifyDB::~CVerifyDB()
 
 bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview, int nCheckLevel, int nCheckDepth)
 {
+
     LOCK(cs_main);
     if (chainActive.Tip() == NULL || chainActive.Tip()->pprev == NULL)
         return true;
@@ -3698,8 +3715,7 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
     CValidationState state;
     int reportDone = 0;
     LogPrintf("[0%%]...");
-    //Open connection to local DB
-    pqxx::connection* conn = openConnection();
+    
     for (CBlockIndex* pindex = chainActive.Tip(); pindex && pindex->pprev; pindex = pindex->pprev)
     {
         boost::this_thread::interruption_point();
@@ -3746,16 +3762,10 @@ bool CVerifyDB::VerifyDB(const CChainParams& chainparams, CCoinsView *coinsview,
             } else
                 nGoodTransactions += block.vtx.size();
         }
-        //Code for logging transactions to local DB
-        if(!pindexFailure){
-            InsertBlockToLocalDB(block,pindex,conn);
-        }
 
         if (ShutdownRequested()){}
             return true;
     }
-    //Close connection to local DB
-    closeConnection(conn);
 
     if (pindexFailure)
         return error("VerifyDB(): *** coin database inconsistencies found (last %i blocks, %i good transactions before that)\n", chainActive.Height() - pindexFailure->nHeight + 1, nGoodTransactions);
