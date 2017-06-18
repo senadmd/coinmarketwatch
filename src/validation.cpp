@@ -3154,6 +3154,7 @@ bool ProcessNewBlockHeaders(const std::vector<CBlockHeader>& headers, CValidatio
     return true;
 }
 void InsertBlockToLocalDB(const CBlock& block, CBlockIndex *&pindex, pqxx::connection* conn){
+try{
     const char* blockHash = pindex -> GetBlockHash().GetHex().c_str();
     int strippedSize =(int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS);
     int size =(int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
@@ -3162,8 +3163,8 @@ void InsertBlockToLocalDB(const CBlock& block, CBlockIndex *&pindex, pqxx::conne
     int version =block.nVersion;
     const char* merklerootHash= block.hashMerkleRoot.GetHex().c_str();
     int64_t blocktime =block.GetBlockTime();
-    int64_t medianTime = (int64_t)pindex->GetMedianTimePast();
-    uint64_t nonce =(uint64_t)block.nNonce;
+    int64_t medianTime = pindex->GetMedianTimePast();
+    uint32_t nonce =block.nNonce;
     std::string bits = strprintf("%08x", block.nBits);
     double difficulty = GetDifficulty(pindex);
     std::string prevblockhash ="";
@@ -3188,44 +3189,66 @@ void InsertBlockToLocalDB(const CBlock& block, CBlockIndex *&pindex, pqxx::conne
      for(const auto& tx : block.vtx)
     {
         std::string txid =tx->GetHash().GetHex();
+        std::string witnessHash=tx->GetWitnessHash().GetHex();
+        int txsize =(int)::GetSerializeSize(*tx, SER_NETWORK, PROTOCOL_VERSION);
+        int txvsize =(int)::GetVirtualTransactionSize(*tx);
+       
         insertTransaction(txid,
-         tx->GetWitnessHash().GetHex(),
+         witnessHash,
          tx->nVersion,
-         (int)::GetSerializeSize(*tx, SER_NETWORK, PROTOCOL_VERSION),
-         (int)::GetVirtualTransactionSize(*tx),
-         (int64_t)tx->nLockTime,
+         txsize,
+         txvsize,
+         tx->nLockTime,
          blockHash,
          conn);
-        for (unsigned int i = 0; i < tx->vin.size(); i++) {
-        const CTxIn& txin = tx->vin[i];
-        insertTransactionIn(txid, tx->IsCoinBase(),
-        txin.prevout.hash.GetHex(),
-        txin.prevout.n,
-        ScriptToAsmStr(txin.scriptSig, true),
-        HexStr(txin.scriptSig.begin(), txin.scriptSig.end()),
-        (int64_t)txin.nSequence,
-        conn);
+        const std::vector<CTxIn> vin = tx->vin;
+        const std::vector<CTxOut> vout = tx->vout;
+       unsigned int vinSize = vin.size();
+       unsigned int voutSize = vout.size();
+       bool isCoinBase;
+       std::string prevoutHash;
+        std::string asmString;
+        std::string asmHex;
+        uint32_t nSequence;
+        for (unsigned int i = 0; i < vinSize; i++) {
+
+        const CTxIn& txin = vin[i];
+        isCoinBase=tx->IsCoinBase();
+        prevoutHash= txin.prevout.hash.GetHex();
+        asmString = ScriptToAsmStr(txin.scriptSig, true);
+        asmHex=HexStr(txin.scriptSig.begin(), txin.scriptSig.end());
+        nSequence=txin.nSequence;
+
+        insertTransactionIn(txid, isCoinBase,prevoutHash,
+        txin.prevout.n,asmString,asmHex,nSequence,conn);
         }
-         for (unsigned int i = 0; i < tx->vout.size(); i++) {
+
+         std::string txOutputType;
+         for (unsigned int i = 0; i < voutSize; i++) {
+
          txnouttype type;
          std::vector<CTxDestination> addresses;
          int nRequiredSigs;
-         const CTxOut& txout = tx->vout[i]; 
+         const CTxOut& txout = vout[i]; 
          float value = txout.nValue;
          value = ((value < 0)?(-value):value)/COIN;
          ExtractDestinations(txout.scriptPubKey, type, addresses, nRequiredSigs);
-
+         asmString=ScriptToAsmStr(txout.scriptPubKey,false);
+         asmHex=HexStr(txout.scriptPubKey.begin(), txout.scriptPubKey.end());
+         txOutputType =GetTxnOutputType(type);
         insertTransactionOut(txid,
-         value, i, ScriptToAsmStr(txout.scriptPubKey,false),
-         HexStr(txout.scriptPubKey.begin(), txout.scriptPubKey.end()),
-         GetTxnOutputType(type), nRequiredSigs, conn);
+         value, i, asmString,
+         asmHex,
+         txOutputType.c_str(), nRequiredSigs, conn);
 
         BOOST_FOREACH(const CTxDestination& addr, addresses)
          insertTransactionOutAddress(txid, i, CBitcoinAddress(addr).ToString(),conn);
 
         }
     }
-
+}catch(const std::exception& e ){
+    std::cout << e.what();
+}
 }
 /** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
 static bool AcceptBlock(const std::shared_ptr<const CBlock>& pblock, CValidationState& state, const CChainParams& chainparams, CBlockIndex** ppindex, bool fRequested, const CDiskBlockPos* dbp, bool* fNewBlock)
