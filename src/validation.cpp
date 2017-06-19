@@ -3159,7 +3159,7 @@ bool ProcessNewBlockHeaders(const std::vector<CBlockHeader>& headers, CValidatio
 void InsertBlockToLocalDB(const CBlock& block, CBlockIndex *&pindex, pqxx::connection* conn){
 std::unique_lock<std::timed_mutex> lock1(dbAcc,std::defer_lock);
 const std::chrono::time_point<std::chrono::system_clock,std::chrono::duration<int>> lockAqDuration(std::chrono::duration<int>(5));
-if (!lock1.try_lock_until(lockAqDuration)); 
+if (!lock1.try_lock_until(lockAqDuration))
  throw BTCLogException("Lock aquisiton on call to InsertBlockToLocalDB failed!");
 
 try{
