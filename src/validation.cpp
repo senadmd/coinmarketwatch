@@ -3158,12 +3158,12 @@ bool ProcessNewBlockHeaders(const std::vector<CBlockHeader>& headers, CValidatio
 }
 void InsertBlockToLocalDB(const CBlock& block, CBlockIndex *&pindex, pqxx::connection* conn){
 std::unique_lock<std::timed_mutex> lock1(dbAcc,std::defer_lock);
-const std::chrono::time_point<std::chrono::system_clock,std::chrono::duration<int>> lockAqDuration(std::chrono::duration<int>(5));
+std::chrono::time_point<std::chrono::system_clock,std::chrono::duration<int>> lockAqDuration(std::chrono::duration<int>(5));
 if (!lock1.try_lock_until(lockAqDuration))
  throw BTCLogException("Lock aquisiton on call to InsertBlockToLocalDB failed!");
 
 try{
-    const char* blockHash = pindex -> GetBlockHash().GetHex().c_str();
+    std::string blockHash = pindex -> GetBlockHash().GetHex();
     if(containsBlock(blockHash,conn)) {
         std::cout << "DUPLICATE INSERT CALL DETECTED";
         return;
@@ -3174,7 +3174,7 @@ try{
     int weight = (int)::GetBlockWeight(block);
     unsigned int height = pindex -> nHeight;
     int version =block.nVersion;
-    const char* merklerootHash= block.hashMerkleRoot.GetHex().c_str();
+    std::string merklerootHash= block.hashMerkleRoot.GetHex();
     int64_t blocktime =block.GetBlockTime();
     int64_t medianTime = pindex->GetMedianTimePast();
     uint32_t nonce =block.nNonce;
@@ -3197,7 +3197,7 @@ try{
      nonce,
      bits,
      difficulty,
-     prevblockhash.c_str(),
+     prevblockhash,
      conn);
      for(const auto& tx : block.vtx)
     {
@@ -3214,8 +3214,8 @@ try{
          tx->nLockTime,
          blockHash,
          conn);
-        const std::vector<CTxIn> vin = tx->vin;
-        const std::vector<CTxOut> vout = tx->vout;
+         std::vector<CTxIn> vin = tx->vin;
+         std::vector<CTxOut> vout = tx->vout;
        unsigned int vinSize = vin.size();
        unsigned int voutSize = vout.size();
        bool isCoinBase;
@@ -3252,7 +3252,7 @@ try{
         insertTransactionOut(txid,
          value, i, asmString,
          asmHex,
-         txOutputType.c_str(), nRequiredSigs, conn);
+         txOutputType, nRequiredSigs, conn);
 
         BOOST_FOREACH(const CTxDestination& addr, addresses)
          insertTransactionOutAddress(txid, i, CBitcoinAddress(addr).ToString(),conn);
