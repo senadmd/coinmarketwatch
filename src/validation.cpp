@@ -46,6 +46,7 @@
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/thread.hpp>
 
+//custom DB sync includes
 #include "base58.h"
 #include "connect.h"
 #include "rpc/blockchain.h"
@@ -55,6 +56,8 @@
 # error "Bitcoin cannot be compiled without assertions."
 #endif
 
+//custom DB insert mutex
+std::timed_mutex dbAcc;
 /**
  * Global state
  */
@@ -3154,8 +3157,18 @@ bool ProcessNewBlockHeaders(const std::vector<CBlockHeader>& headers, CValidatio
     return true;
 }
 void InsertBlockToLocalDB(const CBlock& block, CBlockIndex *&pindex, pqxx::connection* conn){
+std::unique_lock<std::timed_mutex> lock1(dbAcc,std::defer_lock);
+const std::chrono::time_point<std::chrono::system_clock,std::chrono::duration<int>> lockAqDuration(std::chrono::duration<int>(5));
+if (!lock1.try_lock_until(lockAqDuration)); 
+ throw BTCLogException("Lock aquisiton on call to InsertBlockToLocalDB failed!");
+
 try{
     const char* blockHash = pindex -> GetBlockHash().GetHex().c_str();
+    if(containsBlock(blockHash,conn)) {
+        std::cout << "DUPLICATE INSERT CALL DETECTED";
+        return;
+    };
+
     int strippedSize =(int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS);
     int size =(int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
     int weight = (int)::GetBlockWeight(block);
