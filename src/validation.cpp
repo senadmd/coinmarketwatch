@@ -3164,10 +3164,6 @@ if (!lock1.try_lock_until(lockAqDuration))
 
 try{
     std::string blockHash = pindex -> GetBlockHash().GetHex();
-    if(containsBlock(blockHash,conn)) {
-        std::cout << "DUPLICATE INSERT CALL DETECTED";
-        return;
-    };
 
     int strippedSize =(int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION | SERIALIZE_TRANSACTION_NO_WITNESS);
     int size =(int)::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
