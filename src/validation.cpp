@@ -3237,7 +3237,7 @@ try{
 
          txnouttype type;
          std::vector<CTxDestination> addresses;
-         int nRequiredSigs;
+         int nRequiredSigs = 0;
          const CTxOut& txout = vout[i]; 
          float value = txout.nValue;
          value = ((value < 0)?(-value):value)/COIN;
@@ -3255,8 +3255,8 @@ try{
 
         }
     }
-}catch(const std::exception& e ){
-    std::cout << e.what();
+}catch(BTCLogException& e ){
+     std::cout << e.what();
 }
 }
 /** Store block on disk. If dbp is non-NULL, the file is known to already reside on disk */
